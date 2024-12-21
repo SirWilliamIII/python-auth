@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 verify_db_connection.py
-
+.idea
 
 # Distribution / packaging
 .Python
