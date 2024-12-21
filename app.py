@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, redirect, render_template, make_response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
@@ -20,6 +20,9 @@ bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 
 
+print(os.getcwd())
+
+
 # User Model
 class User(db.Model):
     __tablename__ = 'users'
@@ -29,6 +32,11 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
 
+
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 # Routes
 @app.route('/register', methods=['POST'])
@@ -49,7 +57,7 @@ def register():
         return jsonify({'message': 'user registered successfully'}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': 'username already exists or registration failed'}), 400
+        return jsonify({'error': 'username already exists or registration failed, {e}'}), 400
 
 
 @app.route('/login', methods=['POST'])
@@ -64,20 +72,28 @@ def login():
     user = User.query.filter_by(username=username).first()
     if user and bcrypt.check_password_hash(user.password, password):
         token = create_access_token(identity={'id': user.id, 'username': user.username})
-        return jsonify({'message': 'Login successful', 'token': token}), 200
+        response = make_response(redirect('/home'))
+        response.set_cookie(key='access_token_cookie', value=token, httponly=True, secure=True)
+        return response
     return jsonify({'error': 'invalid username or password'})
 
 
 @app.route('/home', methods=['GET'])
-@jwt_required()
+@jwt_required(locations=["cookies"])
 def home():
     curr_user = get_jwt_identity()
     return jsonify({'message': f'welcome to the home page, {curr_user['username']}'}), 200
 
 
+@app.route('/debug', methods=['GET'])
+def debug_cookies():
+    print(request.cookies)
+    return jsonify({'cookies': request.cookies}), 200
+
+
 if __name__=='__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(port=8181, debug=True)
 
 
